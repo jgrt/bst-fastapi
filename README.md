@@ -10,6 +10,12 @@
 
 ### Getting Started:
 
+* clone repository code to your local machine
+
+```
+$ git clone git@github.com:jgrt/bst-fastapi.git
+```
+
 * If you wish to run your own build, first ensure you have docker running in your local machine.
 if not, first get docker [here](https://docs.docker.com/get-docker/) and docker-compose installed.
 
