@@ -1,0 +1,40 @@
+version: '2.4'
+services:
+  neo4j:
+    image: neo4j:3.5
+    restart: unless-stopped
+    ports:
+      - 7474:7474
+      - 7687:7687
+    volumes:
+      - ./graph_data/conf:/conf
+      - ./graph_data/data:/data
+      - ./graph_data/import:/import
+      - ./graph_data/logs:/logs
+      - ./graph_data/plugins:/plugins
+    environment:
+      - NEO4J_AUTH=neo4j/bst_neo4j
+      - NEO4J_dbms_memory_pagecache_size=1G
+      - NEO4J_dbms.memory.heap.initial_size=1G
+      - NEO4J_dbms_memory_heap_max__size=1G
+    healthcheck:
+      test: "exit 0"
+
+  fast_api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./:/app
+    environment:
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASS=bst_neo4j
+    links:
+      - neo4j
+    ports:
+      - "4859:4859"
+    entrypoint: "uvicorn main:app --host 0.0.0.0 --port 4859 --reload"
+    depends_on:
+      neo4j:
+        condition: service_healthy
