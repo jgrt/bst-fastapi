@@ -12,5 +12,5 @@ app = FastAPI()
 async def read_item(key: int):
     conn = Database()
     res = conn.insert(start=True, value=key)
-    print(res)
+    logger.info(res)
     return {"key": key}
