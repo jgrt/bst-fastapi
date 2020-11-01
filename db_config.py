@@ -77,15 +77,6 @@ class Database:
             value=value,
         )
 
-        # node = tx.run(
-        #     "CREATE (node$root)-[:"
-        #     + method
-        #     + "]->(node"
-        #     + str(value)
-        #     + " {value : $value})",
-        #     root=root["element"]["value"],
-        #     value=value,
-        # )
         return node.single()
 
     def create_node(self, parent: Record, value: int, method: str) -> Record:
@@ -131,9 +122,3 @@ class Database:
 
             method = "LEFTCHILD" if parent["element"]["value"] > value else "RIGHTCHILD"
             return self.create_node(parent=parent, value=value, method=method)
-
-
-# if __name__ == "__main__":
-#     conn = Database()
-#     node = conn.insert(start=True, value=13)
-#     print(node)
