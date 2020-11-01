@@ -10,7 +10,7 @@ logger = logging.getLogger()
 class Database:
     def __init__(self):
         self.driver = GraphDatabase.driver(
-            os.environ["NEO4J_URI"],
+            uri=os.environ["NEO4J_URI"],
             auth=(os.environ["NEO4J_USER"], os.environ["NEO4J_PASS"]),
         )
 
@@ -18,20 +18,22 @@ class Database:
         self.driver.close()
 
     @staticmethod
-    def _create_and_return_root(tx) -> Record:
-        result = tx.run("CREATE (root { name: 'ROOT',value: 10 }) RETURN root")
+    def _create_and_return_root(tx, value: int) -> Record:
+        result = tx.run(
+            "CREATE (root: Root{ name: $name, value: $value }) RETURN root",
+            name=value,
+            value=value,
+        )
         return result.single()
 
-    def create_root(self) -> Record:
+    def create_root(self, value: int) -> Record:
         with self.driver.session() as session:
-            root = session.write_transaction(self._create_and_return_root)
+            root = session.write_transaction(self._create_and_return_root, value)
         return root
 
     @staticmethod
     def _get_root(tx) -> Record:
-        root = tx.run(
-            "MATCH (element) WHERE EXISTS(element.name) return element LIMIT 1"
-        )
+        root = tx.run("MATCH (element:Root) RETURN element LIMIT 1")
         return root.single()
 
     def get_root(self) -> Record:
@@ -42,7 +44,7 @@ class Database:
     @staticmethod
     def _get_node(tx, value) -> Record:
         node = tx.run(
-            "MATCH (element) where element.value=$value return element", value=value
+            "MATCH (element:Child {value: $value}) return element", value=value
         )
         return node.single()
 
@@ -65,28 +67,35 @@ class Database:
         return child
 
     @staticmethod
-    def _insert(tx, root: Record, value: int, method: str) -> Record:
-
+    def _insert(tx, parent: Record, value: int, method: str) -> Record:
         node = tx.run(
-            "CREATE (node$root)-[:"
+            "MATCH (parent {value:$parent}) MERGE (parent)-[:"
             + method
-            + "]->(node"
-            + str(value)
-            + " {value : $value})",
-            root=root["element"]["value"],
+            + "]->(child:Child {name: $name, value:$value}) RETURN child",
+            parent=parent["element"]["value"],
+            name=value,
             value=value,
         )
+
+        # node = tx.run(
+        #     "CREATE (node$root)-[:"
+        #     + method
+        #     + "]->(node"
+        #     + str(value)
+        #     + " {value : $value})",
+        #     root=root["element"]["value"],
+        #     value=value,
+        # )
         return node.single()
 
-    def create_node(self, root: Record, value: int, method: str) -> Record:
+    def create_node(self, parent: Record, value: int, method: str) -> Record:
         with self.driver.session() as session:
             child_node = session.write_transaction(
-                self._insert, root=root, value=value, method=method
+                self._insert, parent=parent, value=value, method=method
             )
         return child_node
 
     def insert(self, value: int, root=None, start=False, parent=None) -> Record:
-        print(value, root, start, parent)
 
         """
         start = True, root = None, starting condition
@@ -103,11 +112,17 @@ class Database:
             if node:
                 logger.debug("node already exists")
                 return node
-            return self.insert(value=value, root=self.get_root(), start=False)
+            root = self.get_root()
+            if not root:
+                return self.create_root(value=value)
+            if value == root["element"]["value"]:
+                logger.debug("node already exists")
+                return node
+            else:
+                return self.insert(value=value, root=root, start=False)
 
         if not start:
             if root:
-                print(type(root))
                 method = (
                     "LEFTCHILD" if root["element"]["value"] > value else "RIGHTCHILD"
                 )
@@ -115,4 +130,10 @@ class Database:
                 return self.insert(root=child, value=value, start=False, parent=root)
 
             method = "LEFTCHILD" if parent["element"]["value"] > value else "RIGHTCHILD"
-            return self.create_node(root=parent, value=value, method=method)
+            return self.create_node(parent=parent, value=value, method=method)
+
+
+# if __name__ == "__main__":
+#     conn = Database()
+#     node = conn.insert(start=True, value=13)
+#     print(node)
