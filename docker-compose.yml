@@ -34,7 +34,7 @@ services:
       - neo4j
     ports:
       - "4859:4859"
-    entrypoint: "uvicorn main:app --host 0.0.0.0 --port 4859 --reload"
+    entrypoint: "uvicorn main:app --host 0.0.0.0 --port 4859 --timeout-keep-alive 20"
     depends_on:
       neo4j:
         condition: service_healthy
